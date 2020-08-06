@@ -1,0 +1,567 @@
+### Rest client uses dynamic variable substitution by providing a settings json file.
+# For IntelliJ, create a http-client.private.env.json with the following values
+# {
+#   "local": {
+#     "rest_url": "http://localhost/rest/v10",
+#     "username": "sugar",
+#     "password": "sugar"
+#   }
+# }
+# For VSCode, open your settings as JSON and enter the JSON from above in rest-client.environmentVariables
+
+
+###############################################################################
+###                          Login API                                        #
+###############################################################################
+
+
+### @name loginAPI
+### Auth - Login to Sugar and get the Auth URL
+POST {{rest_url}}/oauth2/token
+Content-Type: application/json
+
+{
+  "grant_type": "password",
+  "client_id": "sugar",
+  "client_secret": "",
+  "username": "{{username}}",
+  "password": "{{password}}",
+  "platform": "base"
+}
+
+> {% client.global.set("access_token", response.body.access_token); %}
+### VS Code - @access_token = {{loginAPI.response.body.access_token}}
+
+
+###############################################################################
+###                          CRUD methods                                     #
+###############################################################################
+
+### @name createAPI
+### 1. Simple Create Request for a record - POST
+POST {{rest_url}}/Contacts
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "name": "Clark Kent",
+  "email": [
+    {
+      "email_address": "clark@kent.com",
+      "primary_address": true
+    }
+  ]
+}
+
+> {% client.global.set("record_id", response.body.id); %}
+### VS Code - @record_id = {{createAPI.response.body.id}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 2. Simple Get Request for a record - All Fields - Slow
+GET {{rest_url}}/Contacts/{{record_id}}
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 3. Simple Get Request for a record - Specific Fields - Fast
+GET {{rest_url}}/Contacts/{{record_id}}&fields=name,email
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 4. Update a Contact - Get Request for a record - Use PUT
+PUT {{rest_url}}/Contacts/{{record_id}}
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "website": "seventunes.com"
+}
+
+
+###---------------------------------------------------------------------------
+
+
+### 5. Delete API - use DELETE
+DELETE {{rest_url}}/Contacts/{{record_id}}
+OAuth-Token: {{access_token}}
+
+
+###############################################################################
+###                     Simple Search/Filters                                 #
+###############################################################################
+
+
+### 1. Simple filter using GET with "equals"
+GET {{rest_url}}/Contacts?filter[0][first_name]=Maria&fields=name
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 2. Same request as POST, using JSON
+POST {{rest_url}}/Contacts/filter&fields=name
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "filter": [
+    {
+      "first_name": "Maria"
+    }
+  ]
+}
+
+
+###----------------------------------------------------------------------------
+
+
+### 3. Same request with operators - you can use $equals, $not_equals
+### For Number Comparison - Use $lt, $lte, $gt and $gte - Similar
+GET {{rest_url}}/Contacts?filter[0][first_name][$equals]=Maria&fields=name
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 4. Filters using Partial Match - You can use $contains/$starts/$ends
+GET {{rest_url}}/Contacts?filter[0][first_name][$contains]=Mari&fields=name
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 5. Partial match using POST
+GET {{rest_url}}/Contacts/filter&fields=name
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "filter": [
+    {
+      "first_name": {
+        "$contains": "Maria"
+      }
+    }
+  ]
+}
+
+
+###############################################################################
+###                          Custom Operators                                 #
+###############################################################################
+
+### 6. AND/OR Operators using GET - Gets a little confusing, better to start using POST for complex filters
+GET {{rest_url}}/Contacts?filter[0][$or][0][first_name]=Maria&filter[0][$or][1][first_name]=Arnold&fields=name
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 7. AND/OR Operators using POST - Much better to understand
+GET {{rest_url}}/Contacts?filter[0][$or][0][first_name]=Maria&filter[0][$or][1][first_name]=Arnold&fields=name
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "filter": [
+    {
+      "$or": [
+        {
+          "first_name": "Maria"
+        },
+        {
+          "first_name": "Arnold"
+        }
+      ]
+    }
+  ]
+}
+
+
+###----------------------------------------------------------------------------
+
+
+### 8. Filtering Array/Dropdown fields - Use $in/$not_in
+GET {{rest_url}}/Contacts?filter[0][lead_source][$in][]=Campaign&filter[0][lead_source][$in][]=Email&fields=name
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 9. $in using POST
+POST {{rest_url}}/Contacts/filter&fields=name,email,lead_source
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "filter": [
+    {
+      "lead_source": {
+        "$in": [
+          "Campaign",
+          "Email"
+        ]
+      }
+    }
+  ]
+}
+
+
+###############################################################################
+###                          Advanced Search/Filters                          #
+###############################################################################
+
+### Advanced Search/Filters - Search/Filter Relate fields and Relationships
+### The examples here uses POST only (for clarity), but you know how to convert to GET if needed
+
+### 1. Filter Emails
+POST {{rest_url}}/Contacts/filter&fields=name,email
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "filter": [
+    {
+      "accounts.email_address": "clark@kent.com"
+    }
+  ]
+}
+
+
+###----------------------------------------------------------------------------
+
+
+### @name accountsFilterAPI
+### 2. Searching Relationships: Using operators
+POST {{rest_url}}/Accounts/filter&fields=name,email,amount,contacts,opportunities
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "filter": [
+    {
+      "opportunities.amount": {
+        "$gt": 5000
+      }
+    }
+  ]
+}
+
+> {% client.global.set("account_id", response.body.records[0].id); %}
+### VS Code - @account_id = {{accountsFilterAPI.response.body.records[0].id}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 3. Filter Relationships. Eg: Narrow down related records of an account - "contacts" provided as an example
+### Unfortunately POST is not supported yet
+GET {{rest_url}}/Accounts/{{account_id}}/link/opportunities/filter?filter[0][amount][$gt]=5000&fields=name,amount
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 4. Search by Tags
+POST {{rest_url}}/Accounts/filter
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "filter": [
+    {
+      "tag": {
+        "$in": ["Arts"]
+      }
+    }
+  ]
+}
+
+###############################################################################
+###                              Relationships                                #
+###############################################################################
+
+
+### Relationships
+### 1. Adding Relationships - Option #1 - If you know the ID
+PUT {{rest_url}}/Accounts/{{account_id}}?fields=meetings
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "meetings": {
+    "add": ["{{meeting_id}}"]
+  }
+}
+
+
+###----------------------------------------------------------------------------
+
+### 2. Adding Relationships - If you want to create a new record
+POST {{rest_url}}/Accounts/{{account_id}}/link/meetings
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "name": "Customer Relationship",
+  "date_start": "2020-08-03T10:00:00Z",
+  "date_end": "2020-08-03T11:00:00Z"
+}
+
+
+###----------------------------------------------------------------------------
+
+
+### @name createMeetingAPI
+### 3. Adding Relationships - Option #3 - Just create the record and specify the related record id
+POST {{rest_url}}/Meetings
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "name": "Customer Relationship",
+  "date_start": "2020-08-03T10:00:00Z",
+  "date_end": "2020-08-03T11:00:00Z",
+  "parent_type": "Accounts",
+  "parent_id": "{{account_id}}"
+}
+
+> {% client.global.set("meeting_id", response.body.id); %}
+### VS Code - @meeting_id = {{createMeetingAPI.response.body.id}}
+
+
+###----------------------------------------------------------------------------
+
+
+### 1. Deleting Relationships - Note - this doesn't delete the record, this only deletes the relationship
+PUT {{rest_url}}/Accounts/{{account_id}}
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "meetings": {
+    "delete": ["{{meeting_id}}"]
+  }
+}
+
+###############################################################################
+###                     Count, Ordering and Pagination                        #
+###############################################################################
+
+
+### Count, Ordering and Pagination
+### In Almost any API that returns a list of records, you can use pagination/count/ordering
+### Count
+GET {{rest_url}}/Opportunities/filter/count?filter[0][amount][$gt]=5000
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### Pagination
+GET {{rest_url}}/Accounts?order_by=name&offset=1&max_num=2&fields=name
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### Enum: Get all possible values for a field - Note this is only possible if you know the field name
+GET {{rest_url}}/Contacts/enum/lead_source
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### Duplicate Check - Use Sugar's inbuilt duplicate check to find if there are similar records
+POST {{rest_url}}/Accounts/duplicateCheck
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "name": "Hollywood"
+}
+
+
+###############################################################################
+###                             Global Search                                 #
+###############################################################################
+
+### Global Search - Elastic Search Only:
+### Global Search - Search All Modules, or specific modules by passing module_list
+GET {{rest_url}}/globalsearch?q=Hollywood&module_list=Accounts,Contacts
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### Global Search Option #2 - Just one module search
+GET {{rest_url}}/Accounts/globalsearch?q=Hollywood
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### Global Search Sorting - It works differently here, doesn't work on order_by
+### This example uses POST instead
+POST {{rest_url}}/globalsearch
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "q": "Mining",
+  "module_list": "Accounts",
+  "sort": {
+    "date_entered": "desc",
+    "name": "desc"
+  }
+}
+
+
+###----------------------------------------------------------------------------
+
+
+### Unified search - /search endpoint, uses both Elastic search and DB Search
+### If no module is specified, uses Elastic search
+### If module is specified and if Elastic search is enabled for a module, then it uses Elastic search
+### None of the above - uses Sugar search
+### Global Search Option #2 - Just one module search
+GET {{rest_url}}/search?q=Hollywood
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### Get Current Logged-in user
+GET {{rest_url}}/me
+OAuth-Token: {{access_token}}
+
+
+###############################################################################
+###                             File Uploads                                  #
+###############################################################################
+
+
+### Files!
+### Get All files associated with a record
+GET {{rest_url}}/Notes/51c9e4ae-c98c-11ea-9162-0242fa516d05/file
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### Download the file
+GET {{rest_url}}/Notes/51c9e4ae-c98c-11ea-9162-0242fa516d05/file/filename
+OAuth-Token: {{access_token}}
+
+
+###----------------------------------------------------------------------------
+
+
+### Uploading a file - Simple - uses PUT, uses the whole PUT content as the file.
+### Notice the argument filename= which specifies the file name
+PUT {{rest_url}}/Notes/51c9e4ae-c98c-11ea-9162-0242fa516d05/file/filename?filename=file.txt
+OAuth-Token: {{access_token}}
+Content-Type: multipart/form-data
+
+< ./relative/path/to/local_file.txt
+
+
+###----------------------------------------------------------------------------
+
+
+### Uploading a file - POST Method, works a bit differently - uses multipart form submission
+### Might be useful in case you want to read additional params
+POST {{rest_url}}/Notes/51c9e4ae-c98c-11ea-9162-0242fa516d05/file/filename
+OAuth-Token: {{access_token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="filename"; filename="file.txt"
+
+< ./relative/path/to/local_file.txt
+--WebAppBoundary--
+
+
+###############################################################################
+###                             Bulk APIs                                     #
+###############################################################################
+
+
+### Bulk API
+### Very very useful if you want to run multiple operations in one batch
+### Uploading a file - POST Method, works a bit differently - uses multipart form submission
+### Might be useful in case you want to read additional params
+POST {{rest_url}}/bulk
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "requests": [
+    {
+      "url": "/v10/Accounts/filter?fields=name",
+      "method": "GET",
+      "data": "{ \"filter\": [ { \"tag\": {\"$in\": [\"Arts\"] } } ] }"
+    },
+    {
+      "url": "/v10/Contacts/filter?fields=name",
+      "method": "GET",
+      "data": "{ \"filter\": [ { \"tag\": {\"$in\": [\"Arts\"] } } ] }"
+    },
+    {
+      "url": "/v10/Meetings/filter?fields=name",
+      "method": "GET",
+      "data": "{ \"filter\": [ { \"tag\": {\"$in\": [\"Arts\"] } } ] }"
+    }
+  ]
+}
+
+
+###----------------------------------------------------------------------------
+
+
+### MassUpdate
+### Useful if you know several IDs and want to do a mass update
+### You can also use MassDelete API to delete multiple ids at the same time
+PUT {{rest_url}}/Accounts/MassUpdate
+Content-Type: application/json
+OAuth-Token: {{access_token}}
+
+{
+  "massupdate_params": {
+    "uid": [
+      "31bd6c03-fca9-40f4-a042-0e0a34e349ee",
+      "1b642ea8-4555-49ce-bebb-0b70f7a17af3"
+    ],
+    "lead_source": "Marketing"
+  }
+}
+
+###############################################################################
+###                More tips and tricks at seventunes.com                     #
+###############################################################################
