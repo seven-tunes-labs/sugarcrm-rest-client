@@ -23,4 +23,4 @@ For VSCode, install REST Client plugin, then open your settings as JSON and ente
 
 SugarCRM provides multiple API versions (starting from v10) - all the REST APIs provided in this article are from v10, but you can always use the latest API version as part of your SugarCRM version.
 
-For detailed explanation, visit [the CheatSheet at SevenTunes.com](https://seventunes.com/sugarcrm-api-cheatsheet)
+For detailed explanation, visit [the CheatSheet at SevenTunes.com](https://seventunes.com/sugarcrm-api-cheatsheet/)
