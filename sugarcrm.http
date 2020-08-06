@@ -1,3 +1,8 @@
+###############################################################################
+#  For full explanation, visit https://seventunes.com/sugarcrm-api-cheatsheet #
+###############################################################################
+
+### For Deatiled 
 ### Rest client uses dynamic variable substitution by providing a settings json file.
 # For IntelliJ, create a http-client.private.env.json with the following values
 # {
